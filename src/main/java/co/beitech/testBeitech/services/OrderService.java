@@ -3,9 +3,12 @@ package co.beitech.testBeitech.services;
 import co.beitech.testBeitech.exceptions.GeneralServiceException;
 import co.beitech.testBeitech.exceptions.NoDataFoundException;
 import co.beitech.testBeitech.exceptions.ValidateServiceException;
+import co.beitech.testBeitech.models.CustomerProductModel;
 import co.beitech.testBeitech.models.CustomerProductPkModel;
 import co.beitech.testBeitech.models.OrderDetailModel;
+import co.beitech.testBeitech.models.OrderModel;
 import co.beitech.testBeitech.models.ProductModel;
+import co.beitech.testBeitech.models.dtos.OrderCustomerProductDTO;
 import co.beitech.testBeitech.models.dtos.OrderDTO;
 import co.beitech.testBeitech.models.dtos.OrderDetailDTO;
 import co.beitech.testBeitech.models.dtos.ProductDetailDTO;
@@ -23,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +36,6 @@ import lombok.extern.slf4j.Slf4j;
 public class OrderService {
 
     private static final OrderTransform ORDER_TRANSFORM = new OrderTransform();
-    private static final CustomerTransform CUSTOMER_TRANSFORM = new CustomerTransform();
     private static final OrderDetailTransform ORDER_DETAIL_TRANSFORM = new OrderDetailTransform();
 
     private final OrderDetailRepository orderDetailRepository;
@@ -49,16 +52,16 @@ public class OrderService {
         this.customerProductRepository = customerProductRepository;
     }
 
-    public List<OrderDTO> findByCustomerModelCustomerId(Long idCustomer,Date initialDate,Date finalDate){
+    public List<OrderCustomerProductDTO> findByCustomerModelCustomerId(Long idCustomer, Date initialDate, Date finalDate){
         try {
 
-            List<OrderDTO>  listOrderDto = orderRepository.findByCustomerModelCustomerIdAndCreationDateBetweenOrderByCreationDateAsc(idCustomer,initialDate,finalDate).stream()
-                .map(ORDER_TRANSFORM::OrderToOrderDTO)
+            List<OrderCustomerProductDTO> listOrderCustomerProductDto = orderRepository.findByCustomerModelCustomerIdAndCreationDateBetweenOrderByCreationDateAsc(idCustomer,initialDate,finalDate).stream()
+                .map(ORDER_TRANSFORM::orderCustomerProductDTOToModel)
                 .collect(Collectors.toList());
 
-            List<OrderDetailModel> listOrderDetailModel = orderDetailRepository.findByOrderModelOrderIdIn(listOrderDto.stream().map(orderDTO -> orderDTO.getOrderId() ).collect(Collectors.toList()));
+            List<OrderDetailModel> listOrderDetailModel = orderDetailRepository.findByOrderModelOrderIdIn(listOrderCustomerProductDto.stream().map(orderCustomerProductDTO -> orderCustomerProductDTO.getOrderId() ).collect(Collectors.toList()));
 
-            for (OrderDTO element :listOrderDto ) {
+            for (OrderCustomerProductDTO element : listOrderCustomerProductDto) {
 
                 Map<String , Integer> productMap =
                 (listOrderDetailModel.stream()
@@ -67,11 +70,11 @@ public class OrderService {
 
                 List<ProductDetailDTO> listProductDetailDTO = new ArrayList<>();
                 productMap.forEach((nombre,cantidad)->listProductDetailDTO.add(new ProductDetailDTO(nombre,cantidad)));
-                element.setListProductDTO(listProductDetailDTO);
+                element.setListProductDetail(listProductDetailDTO);
 
             }
 
-            return listOrderDto ;
+            return listOrderCustomerProductDto;
 
         } catch (ValidateServiceException | NoDataFoundException e) {
             log.info(e.getMessage(), e);
@@ -84,32 +87,31 @@ public class OrderService {
 
     }
 
-    public OrderDTO saveOrder(OrderDTO orderDTO) {
+    public OrderDTO saveOrder(OrderDTO orderDTO)  {
         try {
 
-            double total = 0;
+            OrderModel orderModel  = orderRepository.save(ORDER_TRANSFORM.entityToOrderDTO(orderDTO));
 
-            for(ProductDetailDTO element : orderDTO.getListProductDTO()) {
+            for(OrderDetailDTO element : orderDTO.getListOrderDetail()) {
 
-                ProductModel product = productRepository.findById(element.getProductId())
-                        .orElseThrow(() -> new NoDataFoundException("No existe el producto " + element.getProductId()));
+                ProductModel product = productRepository.findById(element.getProduct().getProductId())
+                        .orElseThrow(() -> new NoDataFoundException("No existe el producto " + element.getProduct()));
 
-               customerProductRepository.findById(new CustomerProductPkModel(orderDTO.getCustomer().getCustomerId(),product.getProductId()  ))
-                        .orElseThrow(() -> new NoDataFoundException("No es validado para el cliente" + orderDTO.getCustomer().getCustomerId()));
+                Optional<CustomerProductModel> customerProduct = customerProductRepository.findById(new CustomerProductPkModel(orderDTO.getCustomer().getCustomerId(),product.getProductId()  ));
 
-               if(element.getQuantity() > 5 ) new ValidateServiceException("la cantidad de elementos de debe ser mayor 5");
+                if(!customerProduct.isPresent()){ new NoDataFoundException("No es validado para el cliente" + orderDTO.getCustomer().getCustomerId());
+                    return orderDTO;};
 
+               if(element.getQuantity() > 5 ) {new ValidateServiceException("la cantidad de elementos de debe ser mayor 5");
+                   return orderDTO;};
+
+                element.setOrder(ORDER_TRANSFORM.orderDTOToEntity(orderModel));
+
+                orderDetailRepository.save(ORDER_DETAIL_TRANSFORM.OrderDetailDTOToOrderDetail(element));
 
             }
 
-
-
-
-
-
-            //OrderModel orderModel  = orderRepository.save(ORDER_TRANSFORM.OrderDTOToOrder(order));
-
-            return orderDTO;
+            return ORDER_TRANSFORM.orderDTOToEntity(orderModel);
 
         } catch (ValidateServiceException | NoDataFoundException e) {
             log.info(e.getMessage(), e);

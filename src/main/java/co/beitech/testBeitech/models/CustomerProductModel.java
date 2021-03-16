@@ -12,6 +12,9 @@ import javax.persistence.Id;
 import javax.persistence.IdClass;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
+import javax.persistence.MapsId;
+import javax.persistence.OneToMany;
+import javax.persistence.OneToOne;
 import javax.persistence.Table;
 import java.io.Serializable;
 
@@ -22,23 +25,19 @@ import java.io.Serializable;
 @NoArgsConstructor
 @Entity
 @Table(name = "customer_product")
-@IdClass(CustomerProductPkModel.class)
 public class CustomerProductModel implements Serializable {
 
-    @Id
-    @Column(name = "customer_id")
-    private Long customerId;
+    @EmbeddedId
+    CustomerProductPkModel customerProductPkModelId;
 
-    @Id
-    @Column(name = "product_id")
-    private Long productId;
-
-    @ManyToOne
-    @JoinColumn(name = "customer_product_customer_id_foreign", nullable = false, updatable = false)
+    @OneToOne
+    //@JoinColumn(name = "customer_product_customer_id_foreign", nullable = false, updatable = false)
+   @JoinColumn(name = "customer_id", referencedColumnName = "customer_id", nullable = false, insertable = false, updatable = false)
     private CustomerModel customerModel;
 
-    @ManyToOne
-    @JoinColumn(name = "customer_product_product_id_foreign", nullable = false, updatable = false)
+    @OneToOne
+   // @JoinColumn(name = "customer_product_product_id_foreign", nullable = false, updatable = false)
+    @JoinColumn(name = "product_id", referencedColumnName = "product_id", nullable = false, insertable = false, updatable = false)
     private ProductModel productModel;
 
 

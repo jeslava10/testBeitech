@@ -14,7 +14,7 @@ import java.util.List;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class OrderDTO {
+public class OrderCustomerProductDTO {
 
     private Long orderId;
 
@@ -27,6 +27,7 @@ public class OrderDTO {
 
     private Double total;
 
-    private List<OrderDetailDTO> listOrderDetail;
+    private List<ProductDetailDTO> listProductDetail;
+
 
 }
